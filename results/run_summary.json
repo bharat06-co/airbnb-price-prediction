@@ -1,0 +1,9 @@
+{
+  "n_listings": {
+    "nyc": 19396,
+    "paris": 43495,
+    "berlin": 8156
+  },
+  "runtime_minutes": 14.5,
+  "quick": false
+}

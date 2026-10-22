@@ -1,0 +1,4 @@
+table,model,train_data,test_data,features,label,train_mse,train_r2,test_mse,test_r2,test_mae_usd,test_r2_usd,n_train,n_test,n_features,seconds,berlin_info,test_r2_ci_low,test_r2_ci_high,pred_overflow_share
+T3,XGBoost,NYC,same-city test split,Text - unigram count,TH,2111.2576033648265,0.9445794618607443,17617.31149374554,0.5580640952313558,90.4285579373436,0.5580640952313558,13058,1863,150,14.8,,,,0.0
+T3,XGBoost,NYC,same-city test split,Text - unigram tf-idf,TH,2210.7192645310943,0.9419685920278666,16462.892236241158,0.5870230722709948,86.63400625485858,0.5870230722709948,13058,1863,150,15.1,,,,0.0
+T3,XGBoost,NYC,same-city test split,Text - uni+bigram tf-idf,TH,1975.2680865889051,0.9481491883540947,16971.858952810122,0.5742554790735943,87.54298992449792,0.5742554790735943,13058,1863,150,16.5,,,,0.0

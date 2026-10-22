@@ -1,0 +1,46 @@
+{
+  "nyc": {
+    "test_r2_log": 0.8875087238724554,
+    "test_mse_log": 0.0850395803762024,
+    "mae_usd": 72.4274136638358,
+    "r2_usd": 0.7233227192183052,
+    "interval_coverage_test": 0.8237113402061855,
+    "n_train": 13577,
+    "n_test": 1940,
+    "interval_nominal_coverage": 0.8,
+    "interval_method": "In-city validation log-residual 10th and 90th percentiles"
+  },
+  "paris": {
+    "test_r2_log": 0.8179312778578165,
+    "test_mse_log": 0.10400123235190656,
+    "mae_usd": 99.31308034162087,
+    "r2_usd": 0.7033344885218928,
+    "interval_coverage_test": 0.8144827586206896,
+    "n_train": 30446,
+    "n_test": 4350,
+    "interval_nominal_coverage": 0.8,
+    "interval_method": "In-city validation log-residual 10th and 90th percentiles"
+  },
+  "berlin": {
+    "test_r2_log": 0.7628392721308738,
+    "test_mse_log": 0.10697470684319303,
+    "mae_usd": 47.57232072962289,
+    "r2_usd": 0.5758063609173643,
+    "interval_coverage_test": 0.821078431372549,
+    "n_train": 5709,
+    "n_test": 816,
+    "interval_nominal_coverage": 0.8,
+    "interval_method": "In-city validation log-residual 10th and 90th percentiles"
+  },
+  "transfer": {
+    "test_r2_log": 0.5257339046155178,
+    "test_mse_log": 0.2139244426143687,
+    "mae_usd": 64.99518519817246,
+    "r2_usd": 0.39790485780634177,
+    "interval_coverage_test": 0.6139705882352942,
+    "evaluated_on": "Berlin test split",
+    "interval_nominal_coverage": 0.8,
+    "interval_method": "Source-city (NYC + Paris) validation log-residual quantiles; not calibrated for Berlin",
+    "interval_warning": "Observed Berlin test coverage 61.4%; do not present this as an 80% Berlin prediction interval."
+  }
+}

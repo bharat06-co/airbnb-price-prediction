@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Predicting Airbnb Listing Price Across Different Cities – Write-up</title>
+<style>
+@page { size: A4; margin: 12mm 13mm 11mm 13mm; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 9.65pt; line-height: 1.34; color: #2C2C2B; }
+header { border-bottom: 1.5pt solid #2C2C2B; padding-bottom: 6pt; margin-bottom: 8pt; }
+.eyebrow { font-size: 8pt; letter-spacing: .06em; text-transform: uppercase; color: #2783DE; font-weight: bold; }
+h1 { font-size: 18pt; line-height: 1.15; margin: 3pt 0 4pt; }
+.meta { font-size: 8.8pt; color: #7D7A75; line-height: 1.45; }
+.meta b { color: #2C2C2B; }
+.cols { column-count: 2; column-gap: 7mm; }
+h2 { font-size: 10.6pt; margin: 7pt 0 2.8pt; break-after: avoid; }
+h2 span { color: #2783DE; margin-right: 4pt; }
+h2:first-child { margin-top: 0; }
+p { margin: 0 0 3.8pt; text-align: left; hyphens: auto; }
+ul { margin: 0 0 3.8pt; padding-left: 11pt; }
+li { margin-bottom: 1.6pt; }
+b.k { color: #2C2C2B; }
+table { width: 100%; border-collapse: collapse; font-size: 8.6pt; line-height: 1.25; margin: 2pt 0 3pt; break-inside: avoid; }
+th { text-align: left; font-weight: bold; color: #7D7A75; font-size: 7.4pt; letter-spacing: .03em; text-transform: uppercase;
+     border-bottom: 1pt solid #2C2C2B; padding: 2pt 3pt; }
+td { border-bottom: .5pt solid #E6E5E3; padding: 2.2pt 3pt; vertical-align: top; }
+td:first-child { font-weight: bold; }
+td.n, th.n { text-align: right; white-space: nowrap; }
+tr.hl td { background: #E5F2FC; }
+.sec { color: #7D7A75; font-weight: normal; }
+figure { margin: 4pt 0 6pt; break-inside: avoid; }
+figure img { width: 100%; display: block; }
+figcaption { font-size: 8.2pt; color: #7D7A75; margin-top: 2pt; line-height: 1.3; }
+.cap { font-size: 8.2pt; color: #7D7A75; margin: 0 0 6pt; }
+.box { background: #F9F8F7; border: .5pt solid #E6E5E3; border-radius: 4pt; padding: 5pt 7pt; margin: 3pt 0 6pt; break-inside: avoid; }
+code { font-family: Menlo, Consolas, monospace; font-size: 8pt; }
+.refs { font-size: 7.9pt; color: #7D7A75; }
+.refs li { margin-bottom: 1pt; }
+.pb { break-before: column; }
+</style></head>
+<body>
+<header>
+  <div class="eyebrow">UE24CS352A Machine Learning · Mini-project write-up · Problem statement #71</div>
+  <h1>Predicting Airbnb Listing Price Across Different Cities</h1>
+  <div class="meta">
+    <div><b>Bharat V Bhat</b> · PES1UG24CS113 · PES1202403301 &nbsp;&nbsp;|&nbsp;&nbsp; <b>Bharath Hegde</b> · PES1UG24CS114 · PES1202400374</div>
+    <div>Code: private GitHub repository · evaluator access supplied separately</div>
+  </div>
+</header>
+
+<div class="cols">
+<h2><span>1</span>Problem statement</h2>
+<p>A new Airbnb host has to choose a nightly price, and a platform entering a new market has no price history to learn from. We study two questions. <b>(i)</b> How well can the nightly price of a listing be predicted from its attributes in New York City, Paris and Berlin? <b>(ii)</b> Can a model trained on other cities predict Berlin prices without local labels? We re-implement Luo, Zhou &amp; Zhou (Stanford CS229, 2019) end to end on fresh 2026 data, check whether their findings still hold, and propose an extension for question (ii).</p>
+
+<h2><span>2</span>Dataset</h2>
+<p>Inside Airbnb <i>detailed listings</i> files (CC BY 4.0), 90 columns per listing, September 2026 snapshots. We keep listings with a price between $10 and $10,000; about 40% of raw rows lack a usable price and are excluded (not necessarily inactive). Paris and Berlin prices are converted from EUR at 1 EUR = 1.15 USD. Each city is split 70 / 20 / 10 into train / validation / test (seed 42), as in the paper.</p>
+<table>
+<tr><th>City</th><th>Snapshot</th><th class="n">Raw rows</th><th class="n">Used</th><th class="n">Median</th></tr>
+<tr><td>New York City</td><td>14 Sep 2026</td><td class="n">29,918</td><td class="n">19,396</td><td class="n">$182</td></tr>
+<tr><td>Paris</td><td>16 Sep 2026</td><td class="n">77,149</td><td class="n">43,495</td><td class="n">$251</td></tr>
+<tr><td>Berlin</td><td>19 Sep 2026</td><td class="n">12,376</td><td class="n">8,156</td><td class="n">$149</td></tr>
+</table>
+<figure><img src="fig1_price.png" alt="Log-price distribution per city">
+<figcaption><b>Figure 1.</b> Prices are right-skewed in every city and close to log-normal. The three cities sit at clearly different price levels.</figcaption></figure>
+<p><b>Schema changes since 2019.</b> Cleaning fee, security deposit and 9 of the paper's 12 text fields no longer exist, so we use 3 text fields (title, description, host bio). The new <code>price_quote_*</code> and <code>estimated_revenue_l365d</code> columns are computed from the price, so we exclude them to avoid label leakage.</p>
+
+<h2><span>3</span>Approach</h2>
+<p><b>Features</b> (all fitted on the training split only):</p>
+<ul>
+<li><b>C</b> continuous (33): size, minimum/maximum nights, availability, reviews and scores, host listing counts, amenity count, location. Mean imputation, standardisation, one of each pair with |r| &gt; 0.9 removed. <b>I</b>: their degree-2 interactions.</li>
+<li><b>O</b> categorical: one-hot room/property type, neighbourhood, superhost, bathroom type, licence status, plus multi-hot top-100 amenities.</li>
+<li><b>T</b> text: TF-IDF (uni- + bigrams) per field, reduced to 50 dimensions with truncated SVD. <b>D</b> dates: days since first/last review, host tenure.</li>
+</ul>
+<p><b>Labels:</b> raw price, TH (only prices ≤ $1000; the paper used $500 when prices were half as high), square root and log. <b>Models:</b> ridge regression and KNN (baselines), random forest, XGBoost with early stopping on the validation split, and the paper's neural network (2 hidden layers of 64/32 ReLU units, SGD with Nesterov momentum 0.9, learning rate 0.005, L2 0.005, batch 64, early stopping). <b>Metrics:</b> R² and MSE on the label scale, as in the paper, plus MAE in dollars so that label transforms can be compared.</p>
+<p><b>Transfer.</b> Train on NYC, Paris or both and test on Berlin (Tables 7–8 in the repo). <b>Robustness.</b> Table 9 repeats the main model with a host-grouped split, so no host has listings in both train and test.</p>
+<div class="box"><b>Our extension.</b> (1) <b>City-agnostic features:</b> drop latitude, longitude and neighbourhood, and add distance to the city centre. (2) <b>Target-city price-level calibration:</b> the model learns <i>y − μ<sub>city</sub></i>, where μ<sub>city</sub> is the city's mean log price, and predicts <i>f(x) + μ<sub>Berlin</sub></i>. μ<sub>Berlin</sub> is estimated from a labelled 10% sample of Berlin's training split. Few-shot models train on the <i>same</i> sample, so both use the same Berlin labels. Zero-shot results are reported separately; the calibrated model is <b>not zero-shot</b>.</div>
+
+<h2><span>4</span>Implementation overview</h2>
+<p>Python 3 with scikit-learn 1.9, XGBoost 3.4 and Streamlit. In <code>src/</code>: <code>config.py</code> holds every constant; <code>data.py</code> loads, cleans and splits; <code>features.py</code> builds the C/I/O/T/D groups as one <code>ColumnTransformer</code> (custom transformers for correlation pruning and amenities); <code>models.py</code> creates the five models; <code>evaluate.py</code> handles labels and metrics. <code>experiments.py</code> regenerates all 9 tables, the figures and <code>results/RESULTS.md</code> in one command (about 15 minutes on a 2-core CPU). <code>train_final.py</code> saves each fitted preprocessor and model as one <code>.joblib</code> bundle, used by <code>predict.py</code> (CLI) and <code>app.py</code> (Streamlit demo). The demo shows a nightly estimate and a residual-based band. For Berlin, its NYC + Paris transfer band is flagged as under-covered (61.4% observed coverage vs. 80% nominal). A fixed seed, pinned requirements and 18 <code>pytest</code> tests, including loading the saved models, keep the results reproducible.</p>
+
+<h2><span>5</span>Results</h2>
+<ul>
+<li><b>XGBoost is the best model</b> in the controlled NYC comparison, followed by random forest and the NN. Trees capture non-linear effects of size, minimum nights and location without scaling.</li>
+<li><b>The log label is the biggest single gain</b> (0.654 → 0.865 on the label scale; in dollars R² 0.654 → 0.721, MAE $103 → $80). Interaction terms add almost nothing (0.866). Categorical features lift NYC to 0.888; text adds nothing on top (0.888 with or without it). Dates alone reach only 0.154 and add nothing on top (0.887), as in the paper.</li>
+<li>The most important features in NYC are shared bathroom, licence status, entire home vs. private room, Manhattan and minimum nights. Licence status and minimum nights reflect NYC's short-term rental rules: 73% of priced NYC listings require stays of 30+ nights, against 19% in Berlin.</li>
+</ul>
+<table>
+<tr><th>Test R² · in-city</th><th class="n">NYC</th><th class="n">Paris</th><th class="n">Berlin</th></tr>
+<tr><td>Ridge / KNN <span class="sec">· C, TH</span></td><td class="n">.466 / .659</td><td class="n"></td><td class="n"></td></tr>
+<tr><td>NN / Random forest <span class="sec">· C, TH</span></td><td class="n">.712 / .778</td><td class="n"></td><td class="n"></td></tr>
+<tr><td>XGBoost <span class="sec">· C, TH</span></td><td class="n">.787</td><td class="n"></td><td class="n"></td></tr>
+<tr><td>XGBoost <span class="sec">· C, raw → log</span></td><td class="n">.654 → .865</td><td class="n"></td><td class="n"></td></tr>
+<tr class="hl"><td>XGBoost <span class="sec">· C+O+T, log</span></td><td class="n">.888</td><td class="n">.818</td><td class="n">.763</td></tr>
+<tr><td>XGBoost <span class="sec">· same, host-grouped split</span></td><td class="n">.847</td><td class="n">.779</td><td class="n">.752</td></tr>
+<tr><td><span class="sec">Paper, XGBoost · C+O+T, log</span></td><td class="n sec">.740</td><td class="n sec">.704</td><td class="n sec">–</td></tr>
+<tr><td>NN <span class="sec">· C+O, log</span></td><td class="n">.835</td><td class="n">.774</td><td class="n"></td></tr>
+<tr><td><span class="sec">Paper, NN · C+O, log</span></td><td class="n sec">.741</td><td class="n sec">.716</td><td class="n sec">–</td></tr>
+</table>
+<p class="cap">MAE of the best models: NYC $72, Paris $99, Berlin $48. Hosts with several near-identical listings make the random split optimistic (host-grouped row). NN on NYC + Paris: .804 pooled (paper .773); per city .841 / .773 vs .835 / .774 for single-city NNs.</p>
+<table>
+<tr><th>Test R² · all of Berlin, unseen</th><th class="n">Ours</th><th class="n">MAE</th><th class="n">Paper</th></tr>
+<tr><td>NN trained on NYC only</td><td class="n">−44,916</td><td class="n">n/a</td><td class="n sec">−3.5</td></tr>
+<tr><td>NN trained on Paris only</td><td class="n">−36,389</td><td class="n">n/a</td><td class="n sec">−17.4</td></tr>
+<tr><td>NN trained on NYC + Paris</td><td class="n">.237</td><td class="n">$106</td><td class="n sec">.514</td></tr>
+</table>
+<p class="cap">n/a: the predictions overflow, so dollar errors are meaningless. Our extension is evaluated on Berlin's test split (Figure 2).</p>
+
+<figure><img src="fig2_transfer.png" alt="Transfer to Berlin results">
+<figcaption><b>Figure 2.</b> Berlin test split, grouped by the Berlin labels used: none; one number (mean log price of a 10% labelled sample, dark blue); the same 10% sample as training rows; the full Berlin training split (grey). Bars: 95% bootstrap CI.</figcaption></figure>
+<p><b>Why single-city models collapse.</b> Features are standardised with the training city's statistics: Berlin's latitude (52.5°) is about 200 sd from NYC's (40.7°, sd ≈ 0.06°), and a ReLU network extrapolates linearly, so its predictions explode. NYC + Paris widens that range, which is largely why combined training appears to "generalise" (0.237; paper 0.514). City-agnostic features alone do not help (NN 0.189 → 0.171, XGB 0.111): the main error is a price-level bias. Calibrating with Berlin's mean log price from the 10% sample lifts XGB to <b>0.526</b> (paper features + level: 0.410, separate CIs do not overlap; not a paired test), similar to training on the sample's rows (0.489). XGB trained on that sample alone gets 0.641, so with 571 local labels transfer no longer pays off. NYC alone still fails (−0.41).</p>
+
+<h2><span>6</span>Conclusions</h2>
+<ul>
+<li>The paper's main findings still hold on 2026 data: log price + XGBoost works best (R² 0.76–0.89 in all three cities), dates are useless, and training on several cities beats any single city when the model is moved to a new one.</li>
+<li>Out-of-range location features and differing price levels plausibly contribute to transfer failure. One number about the new city, its mean log price from a small labelled sample, gives the largest gain (0.111 → 0.526); city-agnostic features alone do not. With 571 local labels, a local model (0.641) is as good.</li>
+<li><b>Limitations:</b> random splits share hosts between train and test (Table 9), one seed, one snapshot per city (no seasonality), listed rather than booked prices, a fixed exchange rate and light tuning. <b>Future work:</b> more source cities, hierarchical or city-embedding models, and listing photos.</li>
+</ul>
+<p><b>Contributions.</b> <b>Bharat V Bhat:</b> data pipeline and features (cleaning, label transforms, text and amenity encoding, correlation pruning), EDA, ridge/KNN baselines, Tables 2–4, tests. <b>Bharath Hegde:</b> random forest, XGBoost and NN, cross-city and transfer experiments (Tables 1, 5–9), the calibration extension, saved models and the Streamlit demo. Both wrote the report and slides.</p>
+<div class="box"><b>Reproduce.</b> <code>pip install -r requirements.txt</code> → <code>python -m pytest -q</code> → <code>python -m src.experiments</code> (all tables and figures) → <code>python -m src.train_final</code> → <code>streamlit run app.py</code>. The data and trained models are included, so the demo runs without retraining.</div>
+<ol class="refs">
+<li>Luo, Zhou, Zhou. <i>Predicting Airbnb Listing Price Across Different Cities.</i> Stanford CS229, 2019.</li>
+<li>Inside Airbnb, insideairbnb.com, listings data, September 2026 (CC BY 4.0).</li>
+<li>Chen &amp; Guestrin. <i>XGBoost: A Scalable Tree Boosting System.</i> KDD 2016. · Pedregosa et al. <i>Scikit-learn.</i> JMLR 2011.</li>
+</ol>
+</div>
+</body></html>
